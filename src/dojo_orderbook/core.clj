@@ -1,6 +1,6 @@
 (ns dojo-orderbook.core)
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+(defrecord Order [name price buy?])
+
+(defrecord Trade [buy-name sell-name price])
+

@@ -43,3 +43,50 @@
   (let [in (async/chan (count agent-specs))
         traders (vec (map #(start % in) agent-specs))]
     in))
+
+(defn addorder [orders price name]
+  (if (seq (orders price))
+    (update orders price conj name)
+    (assoc orders price [name])))
+
+(defn remorder [orders price]
+  (if (< 1 (count (orders price)))
+    (update orders price subvec 1)
+    (dissoc orders price)))
+
+(defn trade-matcher
+  "returns a go process which takes incoming buy/sell limit-orders from the channel *in*, and places any trade matches on channel *out*"
+  [in out]
+  (async/go
+    (loop [curr-item (async/<! in)
+           buys (sorted-map-by >)
+           sells (sorted-map-by <)]
+      (if-let [{curr-name :name curr-price :price curr-buy? :buy?} curr-item]
+        (if curr-buy?
+          (let [[sell-price sell-names :as first-sell] (first sells)]
+            (if (and first-sell (<= sell-price curr-price))
+              (let [sell-name (first sell-names)]
+                (async/>! out
+                  (->TradeMatch
+                    curr-name
+                    sell-name
+                    sell-price))
+                (recur (async/<! in)
+                  buys
+                  (remorder sells sell-price)))
+              (recur (async/<! in)
+                (addorder buys curr-price curr-name)
+                sells)))
+          (let [[buy-price buy-names :as first-buy] (first buys)]
+            (if (and first-buy (<= curr-price buy-price))
+              (let [buy-name (first buy-names)]
+                (async/>! out
+                  (->TradeMatch
+                    buy-name
+                    curr-name
+                    buy-price))
+                (recur (async/<! in)
+                  (remorder buys buy-price) sells))
+              (recur (async/<! in)
+                buys (addorder sells curr-price curr-name)))))
+        (async/close! out)))))

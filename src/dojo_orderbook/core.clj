@@ -66,29 +66,15 @@
           (let [[sell-price sell-names :as first-sell] (first sells)]
             (if (and first-sell (<= sell-price curr-price))
               (let [sell-name (first sell-names)]
-                (async/>! out
-                  (->TradeMatch
-                    curr-name
-                    sell-name
-                    sell-price))
-                (recur (async/<! in)
-                  buys
-                  (remorder sells sell-price)))
-              (recur (async/<! in)
-                (addorder buys curr-price curr-name)
-                sells)))
+                (async/>! out (->TradeMatch curr-name sell-name sell-price))
+                (recur (async/<! in) buys (remorder sells sell-price)))
+              (recur (async/<! in) (addorder buys curr-price curr-name) sells)))
           (let [[buy-price buy-names :as first-buy] (first buys)]
             (if (and first-buy (<= curr-price buy-price))
               (let [buy-name (first buy-names)]
-                (async/>! out
-                  (->TradeMatch
-                    buy-name
-                    curr-name
-                    buy-price))
-                (recur (async/<! in)
-                  (remorder buys buy-price) sells))
-              (recur (async/<! in)
-                buys (addorder sells curr-price curr-name)))))
+                (async/>! out (->TradeMatch buy-name curr-name buy-price))
+                (recur (async/<! in) (remorder buys buy-price) sells))
+              (recur (async/<! in) buys (addorder sells curr-price curr-name)))))
         (async/close! out)))))
 
 (defn trade-printer

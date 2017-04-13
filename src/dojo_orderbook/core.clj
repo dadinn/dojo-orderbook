@@ -90,3 +90,24 @@
               (recur (async/<! in)
                 buys (addorder sells curr-price curr-name)))))
         (async/close! out)))))
+
+(defn trade-printer
+  [ch cnt]
+  "go process taking trade match records from channel *ch*, and prints content to stdout"
+  (async/go
+    (loop [{:keys [buy-name sell-name price]} (async/<! ch)
+           n 0]
+      (when (< n cnt)
+        (println "Trade match: " buy-name "<->" sell-name ":" (str "£" price))
+        (recur (async/<! ch) (inc n))))))
+
+(defn -main [& args]
+  (if (= 1 (count args))
+    (let [cnt (Integer. (first args))]
+      (let [in (gen-orders example-agents)
+            out (async/chan)
+            m (trade-matcher in out)
+            p (trade-printer out cnt)]
+        (async/<!! p)
+        (println "MARKETS CLOSED!!!")))
+    (println "Usage: lein run trade-count\ntrade-count: the number of trades to match and print.")))
